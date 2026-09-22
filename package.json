@@ -1,7 +1,7 @@
 {
   "name": "claude-code-delegate",
-  "version": "0.1.0",
-  "description": "Claude Code skills that hand a build off to another coding agent — Antigravity (agy) or OpenAI Codex — and keep Claude as the orchestrator.",
+  "version": "0.2.0",
+  "description": "Claude Code skills that hand a build off to another coding agent — Antigravity (agy) or OpenAI Codex — and run them in parallel, with Claude as the orchestrator.",
   "keywords": [
     "claude",
     "claude-code",
@@ -13,7 +13,10 @@
     "antigravity",
     "agy",
     "cli",
-    "ai"
+    "ai",
+    "orchestration",
+    "parallel",
+    "subagent"
   ],
   "license": "MIT",
   "author": "Shaurya Ojha",
@@ -34,6 +37,7 @@
     "bin",
     "skills",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {
