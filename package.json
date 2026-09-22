@@ -1,0 +1,45 @@
+{
+  "name": "claude-code-delegate",
+  "version": "0.1.0",
+  "description": "Claude Code skills that hand a build off to another coding agent — Antigravity (agy) or OpenAI Codex — and keep Claude as the orchestrator.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "skill",
+    "skills",
+    "agent",
+    "delegate",
+    "codex",
+    "antigravity",
+    "agy",
+    "cli",
+    "ai"
+  ],
+  "license": "MIT",
+  "author": "Shaurya Ojha",
+  "homepage": "https://github.com/shauryaaojha/claude-code-delegate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shauryaaojha/claude-code-delegate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shauryaaojha/claude-code-delegate/issues"
+  },
+  "type": "module",
+  "bin": {
+    "claude-code-delegate": "bin/cli.mjs",
+    "ccd": "bin/cli.mjs"
+  },
+  "files": [
+    "bin",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node bin/cli.mjs list"
+  }
+}
