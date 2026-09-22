@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.3.0
+
+**`ccd worktree add|list|remove`** — an isolated git worktree per delegate, on its own
+`ccd/<name>` branch. Two agents in one working tree collide, and "do not touch `lib/**`" in
+a task file is advisory; a worktree makes it structural, and the branch is what makes the
+result reviewable — you diff it, then merge it, instead of finding two agents' edits already
+interleaved. `remove` refuses while a tree has uncommitted changes so a tidy-up cannot throw
+away unmerged work, `list` marks a dirty tree, and re-adding a removed worktree reuses its
+branch rather than losing the commits on it. `.ccd/` is added to `.git/info/exclude` — local
+to your clone, so the repo's tracked `.gitignore` is never touched.
+
+**`ccd verify`** — the instruction every skill in this package ends with, as one command.
+Runs the project's own typecheck, lint, build and tests, stopping at the first failure
+because once typecheck is broken the rest is noise. Reports changed-file count, tails the
+failing command's output, and exits non-zero so it works as a gate in a script. `--json` for
+CI. Checks are read from npm scripts, or from `.ccd/config.json` when you would rather say
+exactly what to run:
+
+```json
+{ "verify": ["npm run build", "npm test"] }
+```
+
+It also scans for secrets in what the run *added* — including brand-new untracked files,
+which is how an agent would actually introduce a key, and which `git diff` alone does not
+see. Pre-existing values already in the repo are not reported, and the pattern list is
+deliberately narrow, because a scanner that cries wolf gets ignored.
+
+Considered and cut: a `.ccd/runs/` artifact store with `run new` / `run done` / `run list`.
+It read well on paper, but `run new` only wrapped `ccd task` in a folder, `run done` was
+`ccd verify` writing a JSON file, and nothing could record which agent had actually run
+without being told — observability in name only, plus three subcommands and a state-file
+format to maintain.
+
 ## 0.2.0
 
 **`/delegate` — a third skill, and the reason for the release.** One entry point when you

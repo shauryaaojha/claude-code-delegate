@@ -38,23 +38,44 @@ Two rules that override the table:
 ## Running several at once
 
 This is the point of paying for more than one subscription. Independent work goes out in
-parallel; each delegate gets its own task file and its own log.
+parallel; each delegate gets its own task file, its own log, and its own working tree.
+
+**Give each agent a worktree.** Two agents in one tree collide, and "do not touch `lib/**`"
+in a task file is advisory — a worktree makes it structural, and the branch is what makes
+the result reviewable.
+
+```bash
+npx claude-code-delegate worktree add backend    # → .ccd/worktrees/backend on ccd/backend
+npx claude-code-delegate worktree add frontend
+```
+
+Then point each agent at its own tree:
 
 ```bash
 # one Bash call per agent, each with run_in_background: true
-bash ~/.claude/skills/agy/scripts/run_agy.sh   /tmp/task-content.md  "$PROJECT"
-bash ~/.claude/skills/codex/scripts/run_codex.sh /tmp/task-engine.md "$PROJECT" "" high
+bash ~/.claude/skills/codex/scripts/run_codex.sh task-backend.md  .ccd/worktrees/backend "" high
+bash ~/.claude/skills/agy/scripts/run_agy.sh     task-frontend.md .ccd/worktrees/frontend
 ```
 
-Split so the pieces cannot collide:
-- **By directory.** One agent owns `data/`, the other owns `lib/`. Never two agents in
-  one file.
-- **By dependency.** If B needs A's function signature, either put the signature in both
-  task files, or run them in sequence.
-- Tell each one explicitly what is *not* its job, naming the other's files. "Do not touch
-  `lib/**`" is the single most useful line in a parallel task file.
-- Collect both, then verify once at the end — a build that fails in the middle of a
-  parallel run tells you nothing about which agent broke it until both have landed.
+Review and merge one branch at a time:
+
+```bash
+git diff main..ccd/backend          # read it before it touches your tree
+git merge ccd/backend
+npx claude-code-delegate worktree remove backend
+```
+
+`worktree remove` refuses while there are uncommitted changes, so an unmerged agent's work
+is not thrown away by a tidy-up. `worktree list` marks a dirty tree with `●`.
+
+Still split the *work* sensibly, because a worktree stops collisions, not confusion:
+- **By directory.** One agent owns `data/`, the other owns `lib/`.
+- **By dependency.** If B needs A's function signature, put the signature in both task
+  files, or run them in sequence.
+- Shared files — a barrel `index.ts`, a router table, a global stylesheet — are yours.
+  Each agent writes its own file; you wire them together.
+
+See `references/parallel-split.md` for the full shape.
 
 ## When a delegate dies on quota
 
@@ -83,10 +104,13 @@ difference between a useful run and a wasted hour.
   wrote and what you were unsure about".
 - **Every decision made, none open.** A non-interactive agent cannot ask a question. It
   guesses, and you find out at review time.
-- **Verify before you report.** Run `git status --short`, the build and the tests
-  yourself. Agents report success optimistically. Unused imports, stubbed helpers, files
-  in the wrong folder and tests "fixed" by weakening them are all faster to repair
-  yourself than to re-prompt.
+- **Verify before you report.** `npx claude-code-delegate verify` runs the project's own
+  typecheck, lint, build and tests, stops at the first failure, counts the changed files
+  and scans added lines for committed secrets. Run it in the agent's worktree, not just
+  your own tree. Agents report success optimistically; unused imports, stubbed helpers,
+  files in the wrong folder and tests "fixed" by weakening them are all faster to repair
+  yourself than to re-prompt. It exits non-zero when something fails, so it also works as
+  a gate in a script.
 - **Never let a delegate commit.** You read the diff first. It writes files; you decide
   what enters history.
 

@@ -14,27 +14,14 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createInterface } from 'node:readline/promises';
+import { BANNER, bad, c, card, dim, ok, paint, warn } from '../lib/ui.mjs';
+import { verify as runVerify } from '../lib/verify.mjs';
+import { addWorktree, listWorktrees, removeWorktree, worktreeDirty } from '../lib/worktree.mjs';
 
 const run = promisify(execFile);
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SKILLS_SRC = join(HERE, '..', 'skills');
 const pkg = JSON.parse(await readFile(join(HERE, '..', 'package.json'), 'utf8'));
-
-const c = {
-  reset: '\u001b[0m', dim: '\u001b[2m', bold: '\u001b[1m',
-  orange: '\u001b[38;5;173m', green: '\u001b[32m', red: '\u001b[31m', yellow: '\u001b[33m',
-};
-const supportsColor = process.stdout.isTTY && !process.env.NO_COLOR;
-const paint = (code, s) => (supportsColor ? code + s + c.reset : s);
-const ok = (s) => paint(c.green, s);
-const bad = (s) => paint(c.red, s);
-const dim = (s) => paint(c.dim, s);
-
-const BANNER = `
- ${paint(c.orange, '╭───────────────────────────────────────────╮')}
- ${paint(c.orange, '│')}  ${paint(c.bold, 'claude-code-delegate')}                     ${paint(c.orange, '│')}
- ${paint(c.orange, '│')}  ${dim('hand the typing to another agent')}         ${paint(c.orange, '│')}
- ${paint(c.orange, '╰───────────────────────────────────────────╯')}`;
 
 /**
  * Where Claude Code looks for skills.
@@ -263,6 +250,115 @@ async function task(args) {
   console.log(`   ${dim('bash ~/.claude/skills/codex/scripts/run_codex.sh')} ${paint(c.bold, relative(process.cwd(), target))} ${dim('"' + process.cwd() + '"')}\n`);
 }
 
+/* ------------------------------------------------------------ verifying */
+
+function renderVerify(result) {
+  const glyph = (s) => (s === 'passed' ? ok('✓') : s === 'failed' ? bad('✗') : warn('!'));
+  const rows = result.checks.map((r) => [r.name, `${glyph(r.status)} ${r.status}`]);
+  for (const name of result.skipped) rows.push([name, dim('– skipped')]);
+  if (result.diff.available) rows.push(['diff', dim(`${result.diff.files} file${result.diff.files === 1 ? '' : 's'}`)]);
+  rows.push(['secrets', result.secrets.length ? bad(`✗ ${result.secrets.length}`) : ok('✓ clean')]);
+  return rows;
+}
+
+async function verifyCmd(args) {
+  const { json } = parseArgs(args);
+  const cwd = process.cwd();
+
+  if (!json) console.log(BANNER, '\n');
+  const result = await runVerify(cwd, {
+    onStep: (name) => {
+      // Overwrite in place, padded so a longer previous name leaves no tail.
+      if (!json && process.stdout.isTTY) process.stdout.write(` ${dim('running ' + name + '…')}`.padEnd(40) + '\r');
+    },
+  });
+  if (!json && process.stdout.isTTY) process.stdout.write(' '.repeat(40) + '\r');
+
+  if (json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else if (!result.ranAnyCheck) {
+    console.log(` ${warn('!')} no checks found`);
+    console.log(`\n ${dim('Add npm scripts (typecheck / lint / build / test), or list commands in')} ${paint(c.bold, '.ccd/config.json')}${dim(':')}`);
+    console.log(`   ${dim('{ "verify": ["npm run build", "npm test"] }')}\n`);
+  } else {
+    console.log(card('VERIFY', renderVerify(result)));
+    const failed = result.checks.find((r) => r.status !== 'passed');
+    if (failed?.output) {
+      console.log(`\n ${bad(failed.name + ' output')} ${dim('(tail)')}\n`);
+      console.log(failed.output.split('\n').slice(-25).map((l) => '   ' + l).join('\n'));
+    }
+    for (const s of result.secrets) {
+      console.log(`\n ${bad('possible ' + s.label)} in ${s.file}`);
+    }
+    console.log();
+  }
+
+  if (!result.ok) process.exitCode = 1;
+  return result;
+}
+
+/* ----------------------------------------------------------- worktrees */
+
+async function worktreeCmd(args) {
+  const { positional, force, json } = parseArgs(args);
+  const [sub = 'list', name] = positional;
+  const cwd = process.cwd();
+
+  if (sub === 'add') {
+    if (!name) {
+      console.error(bad('usage: ccd worktree add <name>'));
+      process.exitCode = 1;
+      return;
+    }
+    const r = await addWorktree(cwd, name);
+    if (!r.ok) {
+      console.error(bad(r.error));
+      process.exitCode = 1;
+      return;
+    }
+    if (json) return console.log(JSON.stringify(r, null, 2));
+    console.log(` ${ok('✓')} ${relative(cwd, r.path)} ${dim('on ' + r.branch + (r.reusedBranch ? ' (existing branch)' : ''))}`);
+    console.log(`\n ${dim('Point the delegate at it, then review the branch before merging:')}`);
+    console.log(`   ${dim('git diff main..' + r.branch)}\n`);
+    return;
+  }
+
+  if (sub === 'remove') {
+    if (!name) {
+      console.error(bad('usage: ccd worktree remove <name>'));
+      process.exitCode = 1;
+      return;
+    }
+    const r = await removeWorktree(cwd, name, { force });
+    if (!r.ok) {
+      console.error(bad(r.error));
+      process.exitCode = 1;
+      return;
+    }
+    console.log(` ${ok('✓')} removed ${relative(cwd, r.path)}`);
+    return;
+  }
+
+  if (sub === 'list') {
+    const trees = await listWorktrees(cwd);
+    if (json) return console.log(JSON.stringify(trees, null, 2));
+    console.log(BANNER, '\n');
+    if (!trees.length) {
+      console.log(` ${dim('no delegate worktrees — create one with')} ${paint(c.bold, 'ccd worktree add <name>')}\n`);
+      return;
+    }
+    for (const t of trees) {
+      const dirty = await worktreeDirty(t.path);
+      console.log(` ${dirty ? warn('●') : ok('○')} ${paint(c.bold, (t.branch ?? '?').padEnd(22))} ${dim(relative(cwd, t.path) || '.')}${dirty ? warn('  uncommitted') : ''}`);
+    }
+    console.log();
+    return;
+  }
+
+  console.error(bad(`unknown: ccd worktree ${sub}`), dim('(add | list | remove)'));
+  process.exitCode = 1;
+}
+
 /**
  * Is the agent CLI these skills drive actually usable on this machine?
  *
@@ -340,6 +436,8 @@ function help() {
    update              refresh the skills you already have
    uninstall [skill…]  remove them again
    task [name]         scaffold a task file from the template
+   verify              run this project's checks and report what really passed
+   worktree <cmd>      ${dim('add | list | remove')} — an isolated tree per agent
    list                what this package ships, and what is installed
    doctor              check the agent CLIs the skills drive
    help                this
@@ -348,13 +446,14 @@ function help() {
    -p, --project       target ./.claude/skills instead of your home dir
    -f, --force         replace an existing skill without asking
    -y, --yes           answer yes to every prompt
-       --json          machine-readable output ${dim('(doctor)')}
+       --json          machine-readable output ${dim('(doctor, verify, worktree)')}
 
  ${paint(c.bold, 'Examples')}
    npx claude-code-delegate install
    npx claude-code-delegate install --project      ${dim('# commit them with the repo')}
    npx claude-code-delegate task refactor-auth
-   npx claude-code-delegate doctor --json
+   npx claude-code-delegate worktree add backend   ${dim('# then point an agent at it')}
+   npx claude-code-delegate verify
 
  ${dim('v' + pkg.version + ' · MIT · https://github.com/shauryaaojha/claude-code-delegate')}
 `);
@@ -363,6 +462,7 @@ function help() {
 const [command = 'help', ...rest] = process.argv.slice(2);
 const commands = {
   install, update, uninstall, task, list, doctor, help,
+  verify: verifyCmd, worktree: worktreeCmd,
   '--help': help, '-h': help,
   '--version': () => console.log(pkg.version), '-v': () => console.log(pkg.version),
 };

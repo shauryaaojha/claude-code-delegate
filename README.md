@@ -28,12 +28,14 @@ That copies the skills into `~/.claude/skills/`. Restart Claude Code and type `/
 will reach for the skill on its own.
 
 ```bash
-npx claude-code-delegate doctor             # are the agent CLIs actually on PATH?
-npx claude-code-delegate task refactor-auth # scaffold a task file from the template
-npx claude-code-delegate install --project  # install into ./.claude/skills, commit with the repo
-npx claude-code-delegate update             # refresh the skills you already have
-npx claude-code-delegate list               # what ships here, what is installed
-npx claude-code-delegate uninstall          # take them back out
+npx claude-code-delegate doctor              # are the agent CLIs actually on PATH?
+npx claude-code-delegate task refactor-auth  # scaffold a task file from the template
+npx claude-code-delegate worktree add api    # an isolated tree + branch for one agent
+npx claude-code-delegate verify              # what actually passed, not what it claimed
+npx claude-code-delegate install --project   # install into ./.claude/skills, ship with the repo
+npx claude-code-delegate update              # refresh the skills you already have
+npx claude-code-delegate list                # what ships here, what is installed
+npx claude-code-delegate uninstall           # take them back out
 ```
 
 `ccd` works as a short alias for every command.
@@ -55,6 +57,36 @@ skills split the job:
 | fixes the leftovers, re-prompts | |
 
 You keep the context and the judgement. The other agent keeps the keyboard.
+
+## Two agents at once
+
+Each delegate gets its own worktree and its own branch, so they cannot edit the same file
+out from under each other:
+
+```bash
+ccd worktree add backend      # → .ccd/worktrees/backend on ccd/backend
+ccd worktree add frontend
+# point one agent at each, then review a branch before it touches your tree
+git diff main..ccd/backend
+```
+
+`ccd verify` is the other half. It runs the project's real typecheck, lint, build and
+tests, stops at the first failure, counts changed files, and scans added lines — including
+new untracked files — for committed secrets. It exits non-zero, so it gates a script as
+well as it informs you.
+
+```
+ ╭──────────────────────╮
+ │ VERIFY               │
+ ├──────────────────────┤
+ │ typecheck   ✓ passed │
+ │ lint        ✗ failed │
+ │ build      – skipped │
+ │ tests      – skipped │
+ │ diff         4 files │
+ │ secrets      ✓ clean │
+ ╰──────────────────────╯
+```
 
 ## What each skill knows
 
