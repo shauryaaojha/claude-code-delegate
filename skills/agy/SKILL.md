@@ -1,6 +1,6 @@
 ---
 name: agy
-description: Delegate coding work to the Antigravity `agy` CLI agent (Google Antigravity, non-interactive print mode). Use this whenever the user says "agy", "antigravity", "antigravity se karwa", "spawn antigravity", "delegate to antigravity", asks you to "make antigravity build/fix/scaffold X", wants to change the antigravity model, or wants a large build/scaffold/refactor task offloaded to another coding agent while you orchestrate. Also use it when the user has previously said coding should go through antigravity and a new implementation task comes up.
+description: Delegate coding work to the Antigravity `agy` CLI agent (Google Antigravity, non-interactive print mode). Use this whenever the user says "agy", "antigravity", "antigravity se karwa", "spawn antigravity", "delegate to antigravity", asks you to "make antigravity build/fix/scaffold X", wants to change the antigravity model, or wants a large build/scaffold/refactor task offloaded to another coding agent while you orchestrate. Also use it to generate raster images — icons, illustrations, hero images, placeholder art, "image bana do", "generate an image/logo/icon" — since agy has a built-in image generation tool and you do not. Also use it when the user has previously said coding should go through antigravity and a new implementation task comes up.
 ---
 
 # agy — delegating coding tasks to Antigravity
@@ -102,6 +102,38 @@ same command, or `agy -c -p "…"` to continue the last conversation) only for s
 
 If agy's quota dies mid-task, finish the remaining items yourself — don't leave the user with
 a half-built tree.
+
+## Generating images
+
+agy has a built-in `generate_image` tool; you don't. When a task needs a real raster image
+(app icon, illustration, hero image, placeholder art), send just that image to agy
+instead of drawing it with SVG or canvas code.
+
+```bash
+bash ~/.claude/skills/agy/scripts/gen_image_agy.sh <prompt-file> <out-dir>/<name>.png [model] [timeout]
+```
+
+- **The prompt file describes only the picture:** subject, style, composition, colours,
+  what to leave empty, and "no text" unless you want lettering. The script adds the
+  instructions agy needs: use `generate_image`, don't draw it with code, save under
+  exactly this name, touch nothing else.
+- **It runs agy inside the output folder**, because agy saves relative to its workspace.
+  It refuses to overwrite an existing file.
+- **It checks the file, not the summary.** It exits `2` if nothing was saved and `3` if
+  the file isn't a PNG/JPEG/WebP (usually agy fell back to writing an SVG). On a
+  non-zero exit, re-run once. Don't paper over it.
+- **Look at the result before using it.** Read the PNG yourself. Image models misspell
+  lettering and ignore negative instructions, so check the details the task depends on.
+- Output is 1024×1024 PNG by default, around 800 KB. Resize or compress for the web
+  yourself; don't ship it raw as a favicon.
+- One image per run. For a set (e.g. five feature illustrations), launch one run per image
+  with `run_in_background: true` rather than asking one run for all five, so one failure
+  doesn't cost the whole set.
+- Tested with `gemini-3.8-flash-high`. Keep the default model unless it refuses or fails.
+
+Inside a larger build task, you can also just write "generate `public/hero.png` with your
+image generation tool — do not draw it with code" in the task file. Afterwards, check it's
+a real image the same way (`file public/hero.png`).
 
 ## Interactive / other modes
 

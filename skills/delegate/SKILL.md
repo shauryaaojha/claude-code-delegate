@@ -27,6 +27,7 @@ choice. If none are available, say so and do the work yourself rather than stall
 |---|---|---|
 | bulk scaffolding, many similar files, content authoring | `agy` (flash model) | cheapest per token, and the work is mechanical |
 | algorithmic logic, tricky refactor, anything with a subtle invariant | `codex` (raise reasoning effort) | thinks harder before it types |
+| a raster image — icon, illustration, hero, placeholder art | `agy` via `scripts/gen_image_agy.sh` | built-in `generate_image`; see the agy skill's "Generating images" |
 | a second opinion on a diff | `codex exec review --sandbox read-only` | reports, does not edit |
 | anything touching auth, payments, migrations or deletes | nobody — do it yourself | the review cost exceeds the typing saved |
 

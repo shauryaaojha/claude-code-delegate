@@ -110,6 +110,18 @@ Runs `agy -p` in print mode: one autonomous turn in a workspace, then exit. Cove
 selection (`--model`), `--print-timeout` for long builds, `--add-dir` scoping, and what to
 do when a run dies on quota.
 
+It also **generates images**. Claude can't produce a PNG, but agy has a built-in
+`generate_image` tool, so an icon, illustration or hero image goes to agy instead of
+being faked with SVG:
+
+```bash
+bash ~/.claude/skills/agy/scripts/gen_image_agy.sh prompt.md public/hero.png
+```
+
+The prompt file describes the picture. The script tells agy which tool to use and where
+to save, then checks the file really is an image. It exits non-zero if nothing landed or
+if agy drew an SVG and named it `.png`.
+
 ### `/codex` — OpenAI Codex
 
 Runs `codex exec`. Covers sandbox levels (`workspace-write` vs `read-only` vs

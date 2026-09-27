@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0
+
+**Image generation through `/agy`.** Claude can't produce a raster image, and an SVG
+standing in for a hero illustration looks like one. Antigravity has a built-in
+`generate_image` tool, so the agy skill now sends images there. The new
+`skills/agy/scripts/gen_image_agy.sh <prompt-file> <out.png>` takes a prompt file that
+describes only the picture and adds the rest: use `generate_image`, don't draw with code,
+save under exactly this name, touch nothing else. It runs agy inside the output folder,
+because agy saves relative to its workspace, and refuses to overwrite an existing file.
+
+It trusts the file, not agy's closing line. It exits `2` when nothing was saved and `3`
+when the file's magic bytes aren't PNG, JPEG or WebP, which is what you get when an agent
+falls back to writing an SVG and calling it `.png`. Tested end to end with
+`gemini-3.8-flash-high`: a 1024×1024 PNG. The script's success and failure paths are
+covered against a stubbed `agy`.
+
+`/delegate` routes image requests to agy.
+
+Not in this release: Codex image generation. The Codex CLI has an `image_generation`
+feature and it's switched on, but the test account hit its usage limit before a run could
+confirm it writes a file. It ships once it has been seen working.
+
 ## 0.3.0
 
 **`ccd worktree add|list|remove`** — an isolated git worktree per delegate, on its own
